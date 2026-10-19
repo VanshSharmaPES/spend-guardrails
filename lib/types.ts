@@ -74,7 +74,7 @@ export type AuditEntry = {
   id: string;
   proposal: PurchaseProposal;
   verdict: PolicyVerdict;
-  humanAction?: { by: string; decision: 'APPROVED' | 'REJECTED'; at: string };
+  humanAction?: { by: string; decision: 'APPROVED' | 'REJECTED' | 'EXPIRED'; at: string };
   execution?: { paypalOrderId: string; status: string; capturedAt: string };
   createdAt: string;
 };
