@@ -15,6 +15,7 @@ import {
 } from './queries';
 import { evaluate } from '../policy';
 import type { Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
+import { ensurePolicy } from './queries';
 
 const T0 = '2026-10-19T12:00:00.000Z';
 const at = (hours: number) => new Date(Date.parse(T0) + hours * 3_600_000).toISOString();
@@ -186,5 +187,26 @@ describe('policies', () => {
 
   it('returns undefined for an agent with no policy', () => {
     expect(getPolicy(db, 'nobody')).toBeUndefined();
+  });
+});
+
+
+describe('ensurePolicy', () => {
+  const seed: Policy = {
+    id: 'seed',
+    agentId: 'agent-1',
+    rules: [{ type: 'per-transaction-cap', id: 'cap', maxAmount: 100, decision: 'ESCALATE' }],
+  };
+
+  it('stores the policy when the agent has none', () => {
+    ensurePolicy(db, seed, T0);
+    expect(getPolicy(db, 'agent-1')).toEqual(seed);
+  });
+
+  it('never overwrites a policy that already exists', () => {
+    const edited: Policy = { ...seed, rules: [] };
+    savePolicy(db, edited, T0);
+    ensurePolicy(db, seed, at(1));
+    expect(getPolicy(db, 'agent-1')).toEqual(edited);
   });
 });

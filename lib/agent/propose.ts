@@ -1,8 +1,10 @@
+import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { catalogue, type CatalogueItem } from '../catalogue';
+import { getHistory, getPolicy, recordDecision } from '../db/queries';
 import { convertToHomeCurrency } from '../fx';
 import { evaluate } from '../policy';
-import type { AuditEntry, Policy, PolicyVerdict, PurchaseProposal } from '../types';
+import type { AuditEntry, PurchaseProposal } from '../types';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -124,11 +126,17 @@ export async function proposePurchase(
 }
 
 export async function runAgentTurn(
+  db: Database.Database,
   goal: string,
-  opts: { agentId: string; policy: Policy; history: AuditEntry[]; homeCurrency?: string },
-): Promise<{ proposal: PurchaseProposal; verdict: PolicyVerdict }> {
+  opts: { agentId: string; homeCurrency?: string },
+): Promise<AuditEntry> {
+  const policy = getPolicy(db, opts.agentId);
+  if (!policy) throw new Error(`No policy configured for agent ${opts.agentId}`);
+
   const now = new Date();
   const proposal = await proposePurchase(goal, { agentId: opts.agentId, homeCurrency: opts.homeCurrency, now });
-  const verdict = evaluate(proposal, { history: opts.history, now: now.toISOString() }, opts.policy);
-  return { proposal, verdict };
+  const nowIso = now.toISOString();
+  const verdict = evaluate(proposal, { history: getHistory(db, opts.agentId, nowIso), now: nowIso }, policy);
+  return recordDecision(db, proposal, verdict, opts.homeCurrency);
 }
+
