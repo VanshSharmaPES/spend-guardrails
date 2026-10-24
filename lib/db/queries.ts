@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { AuditEntry, Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
+import type { AuditEntry, AuditRow, Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
 
 export const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
 const HISTORY_DAYS = 7;
@@ -130,6 +130,12 @@ export function getPendingApprovals(db: Database.Database, now: string): AuditEn
     .prepare(`${SELECT_ENTRIES} WHERE d.decision = 'ESCALATE' AND h.decision_id IS NULL ORDER BY d.expires_at`)
     .all() as Row[];
   return rows.map(toEntry);
+}
+
+// Newest first. Expires overdue approvals first so nothing past its deadline still reads as PENDING.
+export function getAuditRows(db: Database.Database, now = new Date().toISOString()): AuditRow[] {
+  expireOverdue(db, now);
+  return db.prepare('SELECT * FROM audit_rows ORDER BY createdAt DESC, id').all() as AuditRow[];
 }
 
 export function resolveApproval(

@@ -78,3 +78,30 @@ export type AuditEntry = {
   execution?: { paypalOrderId: string; status: string; capturedAt: string };
   createdAt: string;
 };
+
+export type AuditStatus = 'EXECUTED' | 'DENIED' | 'REJECTED' | 'EXPIRED' | 'PENDING' | 'AWAITING_EXECUTION';
+
+// One flat row per decision, read from the audit_rows view. Flat so the dashboard grid can filter and aggregate it as is.
+export type AuditRow = {
+  id: string;
+  agentId: string;
+  merchant: string;
+  category: string;
+  amountValue: string;
+  amountCurrency: string;
+  amountHome: number;
+  homeCurrency: string;
+  decision: Decision;
+  ruleId: string;
+  reason: string;
+  rationale: string;
+  createdAt: string;
+  expiresAt: string | null;
+  humanAction: 'APPROVED' | 'REJECTED' | 'EXPIRED' | null;
+  humanBy: string | null;
+  humanAt: string | null;
+  paypalOrderId: string | null;
+  executionStatus: string | null;
+  capturedAt: string | null;
+  status: AuditStatus;
+};

@@ -6,6 +6,7 @@ import {
   ApprovalError,
   ensurePolicy,
   getAuditEntry,
+  getAuditRows,
   getHistory,
   getPendingApprovals,
   getPolicy,
@@ -163,6 +164,39 @@ describe('approval queue', () => {
     recordDecision(db, later, verdict('ESCALATE', at(2)));
     recordDecision(db, sooner, verdict('ESCALATE', at(1)));
     expect(getPendingApprovals(db, at(3)).map((e) => e.id)).toEqual([sooner.id, later.id]);
+  });
+});
+
+describe('getAuditRows', () => {
+  it('returns flat rows, newest first', () => {
+    const older = proposal({ id: 'older' });
+    const newer = proposal({ id: 'newer' });
+    recordDecision(db, older, verdict('ALLOW'));
+    recordDecision(db, newer, verdict('DENY', at(1)));
+    recordExecution(db, 'older', { paypalOrderId: 'ORDER-1', status: 'COMPLETED', capturedAt: at(0.1) });
+
+    const rows = getAuditRows(db, at(2));
+    expect(rows.map((r) => [r.id, r.status])).toEqual([
+      ['newer', 'DENIED'],
+      ['older', 'EXECUTED'],
+    ]);
+    expect(rows[1]).toMatchObject({
+      agentId: 'agent-1',
+      amountValue: '45.00',
+      amountCurrency: 'EUR',
+      amountHome: 50.64,
+      homeCurrency: 'USD',
+      decision: 'ALLOW',
+      paypalOrderId: 'ORDER-1',
+      humanAction: null,
+    });
+  });
+
+  it('expires overdue escalations instead of reporting them as pending', () => {
+    const p = proposal();
+    recordDecision(db, p, verdict('ESCALATE'));
+    expect(getAuditRows(db, at(1))[0].status).toBe('PENDING');
+    expect(getAuditRows(db, at(25))[0]).toMatchObject({ status: 'EXPIRED', humanAction: 'EXPIRED', humanBy: 'system' });
   });
 });
 
