@@ -4,6 +4,7 @@ import { openDatabase } from './schema';
 import {
   APPROVAL_TTL_MS,
   ApprovalError,
+  ensurePolicy,
   getAuditEntry,
   getHistory,
   getPendingApprovals,
@@ -15,7 +16,6 @@ import {
 } from './queries';
 import { evaluate } from '../policy';
 import type { Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
-import { ensurePolicy } from './queries';
 
 const T0 = '2026-10-19T12:00:00.000Z';
 const at = (hours: number) => new Date(Date.parse(T0) + hours * 3_600_000).toISOString();
@@ -189,7 +189,6 @@ describe('policies', () => {
     expect(getPolicy(db, 'nobody')).toBeUndefined();
   });
 });
-
 
 describe('ensurePolicy', () => {
   const seed: Policy = {

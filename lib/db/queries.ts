@@ -190,3 +190,10 @@ export function getPolicy(db: Database.Database, agentId: string): Policy | unde
     | undefined;
   return row && { id: row.id, agentId: row.agent_id, rules: JSON.parse(row.rules_json) };
 }
+
+// Seeds a policy without clobbering one a user has since edited.
+export function ensurePolicy(db: Database.Database, policy: Policy, now: string): void {
+  db.prepare(
+    `INSERT INTO policies (agent_id, id, rules_json, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (agent_id) DO NOTHING`,
+  ).run(policy.agentId, policy.id, JSON.stringify(policy.rules), now);
+}
