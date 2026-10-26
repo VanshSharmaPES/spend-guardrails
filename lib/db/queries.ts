@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { AuditEntry, Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
+import type { AuditEntry, AuditRow, Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
 
 export const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
 const HISTORY_DAYS = 7;
@@ -132,6 +132,12 @@ export function getPendingApprovals(db: Database.Database, now: string): AuditEn
   return rows.map(toEntry);
 }
 
+// Newest first. Expires overdue approvals first so nothing past its deadline still reads as PENDING.
+export function getAuditRows(db: Database.Database, now = new Date().toISOString()): AuditRow[] {
+  expireOverdue(db, now);
+  return db.prepare('SELECT * FROM audit_rows ORDER BY createdAt DESC, id').all() as AuditRow[];
+}
+
 export function resolveApproval(
   db: Database.Database,
   decisionId: string,
@@ -189,4 +195,11 @@ export function getPolicy(db: Database.Database, agentId: string): Policy | unde
     | { id: string; agent_id: string; rules_json: string }
     | undefined;
   return row && { id: row.id, agentId: row.agent_id, rules: JSON.parse(row.rules_json) };
+}
+
+// Seeds a policy without clobbering one a user has since edited.
+export function ensurePolicy(db: Database.Database, policy: Policy, now: string): void {
+  db.prepare(
+    `INSERT INTO policies (agent_id, id, rules_json, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (agent_id) DO NOTHING`,
+  ).run(policy.agentId, policy.id, JSON.stringify(policy.rules), now);
 }

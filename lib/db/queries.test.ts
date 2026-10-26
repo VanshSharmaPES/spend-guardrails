@@ -4,7 +4,9 @@ import { openDatabase } from './schema';
 import {
   APPROVAL_TTL_MS,
   ApprovalError,
+  ensurePolicy,
   getAuditEntry,
+  getAuditRows,
   getHistory,
   getPendingApprovals,
   getPolicy,
@@ -165,6 +167,39 @@ describe('approval queue', () => {
   });
 });
 
+describe('getAuditRows', () => {
+  it('returns flat rows, newest first', () => {
+    const older = proposal({ id: 'older' });
+    const newer = proposal({ id: 'newer' });
+    recordDecision(db, older, verdict('ALLOW'));
+    recordDecision(db, newer, verdict('DENY', at(1)));
+    recordExecution(db, 'older', { paypalOrderId: 'ORDER-1', status: 'COMPLETED', capturedAt: at(0.1) });
+
+    const rows = getAuditRows(db, at(2));
+    expect(rows.map((r) => [r.id, r.status])).toEqual([
+      ['newer', 'DENIED'],
+      ['older', 'EXECUTED'],
+    ]);
+    expect(rows[1]).toMatchObject({
+      agentId: 'agent-1',
+      amountValue: '45.00',
+      amountCurrency: 'EUR',
+      amountHome: 50.64,
+      homeCurrency: 'USD',
+      decision: 'ALLOW',
+      paypalOrderId: 'ORDER-1',
+      humanAction: null,
+    });
+  });
+
+  it('expires overdue escalations instead of reporting them as pending', () => {
+    const p = proposal();
+    recordDecision(db, p, verdict('ESCALATE'));
+    expect(getAuditRows(db, at(1))[0].status).toBe('PENDING');
+    expect(getAuditRows(db, at(25))[0]).toMatchObject({ status: 'EXPIRED', humanAction: 'EXPIRED', humanBy: 'system' });
+  });
+});
+
 describe('policies', () => {
   const policy: Policy = {
     id: 'pol-1',
@@ -186,5 +221,25 @@ describe('policies', () => {
 
   it('returns undefined for an agent with no policy', () => {
     expect(getPolicy(db, 'nobody')).toBeUndefined();
+  });
+});
+
+describe('ensurePolicy', () => {
+  const seed: Policy = {
+    id: 'seed',
+    agentId: 'agent-1',
+    rules: [{ type: 'per-transaction-cap', id: 'cap', maxAmount: 100, decision: 'ESCALATE' }],
+  };
+
+  it('stores the policy when the agent has none', () => {
+    ensurePolicy(db, seed, T0);
+    expect(getPolicy(db, 'agent-1')).toEqual(seed);
+  });
+
+  it('never overwrites a policy that already exists', () => {
+    const edited: Policy = { ...seed, rules: [] };
+    savePolicy(db, edited, T0);
+    ensurePolicy(db, seed, at(1));
+    expect(getPolicy(db, 'agent-1')).toEqual(edited);
   });
 });
