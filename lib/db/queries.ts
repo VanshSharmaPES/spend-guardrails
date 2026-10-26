@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { PolicyValidationError, validatePolicy } from '../policy/validate';
 import type { AuditEntry, AuditRow, Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
 
 export const APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
@@ -188,6 +189,15 @@ export function savePolicy(db: Database.Database, policy: Policy, now: string): 
     `INSERT INTO policies (agent_id, id, rules_json, updated_at) VALUES (?, ?, ?, ?)
      ON CONFLICT (agent_id) DO UPDATE SET id = excluded.id, rules_json = excluded.rules_json, updated_at = excluded.updated_at`,
   ).run(policy.agentId, policy.id, JSON.stringify(policy.rules), now);
+}
+
+// The policy editor saves through here, never through savePolicy directly.
+export function updatePolicy(db: Database.Database, input: unknown, now: string): Policy {
+  const problems = validatePolicy(input);
+  if (problems.length > 0) throw new PolicyValidationError(problems);
+  const policy = input as Policy;
+  savePolicy(db, policy, now);
+  return policy;
 }
 
 export function getPolicy(db: Database.Database, agentId: string): Policy | undefined {

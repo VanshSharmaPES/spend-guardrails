@@ -14,8 +14,10 @@ import {
   recordExecution,
   resolveApproval,
   savePolicy,
+  updatePolicy,
 } from './queries';
 import { evaluate } from '../policy';
+import { PolicyValidationError } from '../policy/validate';
 import type { Decision, Policy, PolicyVerdict, PurchaseProposal } from '../types';
 
 const T0 = '2026-10-19T12:00:00.000Z';
@@ -241,5 +243,37 @@ describe('ensurePolicy', () => {
     savePolicy(db, edited, T0);
     ensurePolicy(db, seed, at(1));
     expect(getPolicy(db, 'agent-1')).toEqual(edited);
+  });
+});
+
+describe('updatePolicy', () => {
+  const valid: Policy = {
+    id: 'pol',
+    agentId: 'agent-1',
+    rules: [{ type: 'per-transaction-cap', id: 'cap', maxAmount: 100, decision: 'ESCALATE' }],
+  };
+
+  it('saves a valid policy', () => {
+    expect(updatePolicy(db, valid, T0)).toEqual(valid);
+    expect(getPolicy(db, 'agent-1')).toEqual(valid);
+  });
+
+  it('refuses an invalid policy, lists every problem, and leaves the saved one untouched', () => {
+    savePolicy(db, valid, T0);
+    const broken = { ...valid, rules: [{ type: 'per-transaction-cap', id: 'cap', maxAmount: -1, decision: 'ALLOW' }] };
+
+    let error: unknown;
+    try {
+      updatePolicy(db, broken, at(1));
+    } catch (e) {
+      error = e;
+    }
+
+    expect(error).toBeInstanceOf(PolicyValidationError);
+    expect((error as PolicyValidationError).problems).toEqual([
+      'Rule "cap": maxAmount must be a positive number',
+      'Rule "cap": decision must be DENY or ESCALATE',
+    ]);
+    expect(getPolicy(db, 'agent-1')).toEqual(valid);
   });
 });
