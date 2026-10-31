@@ -23,15 +23,34 @@ const initialState: AgReportState = {
   pages: [
     {
       id: 'history',
-      widgets: {
+            widgets: {
+        'status-filter': {
+          type: 'list-filter',
+          format: { title: { enabled: true, text: 'Status' } },
+          dataMapping: { value: [{ id: 'audit.status' }] },
+        },
+        'decision-filter': {
+          type: 'list-filter',
+          format: { title: { enabled: true, text: 'Decision' } },
+          dataMapping: { value: [{ id: 'audit.decision' }] },
+        },
+        'merchant-filter': {
+          type: 'list-filter',
+          format: { title: { enabled: true, text: 'Merchant' } },
+          dataMapping: { value: [{ id: 'audit.merchant' }] },
+        },
         'audit-log': {
           type: 'grid',
           format: { title: { enabled: true, text: 'Transaction history' } },
           dataMapping: { cols: COLUMNS.map((name) => ({ id: `audit.${name}` })) },
+          sort: [{ field: { id: 'audit.createdAt' }, direction: 'desc' }],
         },
       },
       widgetLayout: {
-        'audit-log': { xTrack: 0, yTrack: 0, xSpan: 24, ySpan: 24 },
+        'status-filter': { xTrack: 0, yTrack: 0, xSpan: 4, ySpan: 12 },
+        'decision-filter': { xTrack: 0, yTrack: 12, xSpan: 4, ySpan: 10 },
+        'merchant-filter': { xTrack: 0, yTrack: 22, xSpan: 4, ySpan: 14 },
+        'audit-log': { xTrack: 4, yTrack: 0, xSpan: 20, ySpan: 36 },
       },
     },
   ],
