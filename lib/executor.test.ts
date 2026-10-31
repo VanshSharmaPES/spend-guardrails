@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type Database from 'better-sqlite3';
 import { getAuditEntry, recordDecision, resolveApproval } from './db/queries';
 import { openDatabase } from './db/schema';
-import { ExecutionError, executeDecision } from './executor';
+import { approveAndExecute, ExecutionError, executeDecision, rejectDecision } from './executor';
 import { payForProposal } from './paypal';
 import type { Decision, PurchaseProposal } from './types';
 
@@ -78,5 +78,26 @@ describe('executeDecision', () => {
     pay.mockResolvedValueOnce({ ...PAID, status: 'DECLINED' });
     await expect(executeDecision(db, 'd1')).rejects.toThrow('status DECLINED');
     expect(getAuditEntry(db, 'd1')?.execution).toBeUndefined();
+  });
+});
+
+describe('approval flow', () => {
+  it('approving pays and records both events', async () => {
+    decide('d1', 'ESCALATE');
+    const entry = await approveAndExecute(db, 'd1', 'demo-user', LATER);
+    expect(entry.humanAction?.decision).toBe('APPROVED');
+    expect(entry.execution).toEqual(PAID);
+  });
+
+  it('rejecting never pays', () => {
+    decide('d1', 'ESCALATE');
+    expect(rejectDecision(db, 'd1', 'demo-user', LATER).humanAction?.decision).toBe('REJECTED');
+    expect(pay).not.toHaveBeenCalled();
+  });
+
+  it('a late approval is refused and never pays', async () => {
+    decide('d1', 'ESCALATE');
+    await expect(approveAndExecute(db, 'd1', 'demo-user', '2026-10-21T00:00:00.000Z')).rejects.toThrow(/expired/);
+    expect(pay).not.toHaveBeenCalled();
   });
 });

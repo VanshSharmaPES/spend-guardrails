@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { getAuditEntry, recordExecution } from './db/queries';
+import { getAuditEntry, recordExecution, resolveApproval } from './db/queries';
 import { payForProposal } from './paypal';
 import type { AuditEntry } from './types';
 
@@ -26,4 +26,23 @@ export async function executeDecision(db: Database.Database, decisionId: string)
     throw new ExecutionError(`PayPal did not capture the payment: status ${payment.status}`);
   }
   return recordExecution(db, decisionId, payment);
+}
+
+export async function approveAndExecute(
+  db: Database.Database,
+  decisionId: string,
+  by: string,
+  now = new Date().toISOString(),
+): Promise<AuditEntry> {
+  resolveApproval(db, decisionId, 'APPROVED', by, now);
+  return executeDecision(db, decisionId);
+}
+
+export function rejectDecision(
+  db: Database.Database,
+  decisionId: string,
+  by: string,
+  now = new Date().toISOString(),
+): AuditEntry {
+  return resolveApproval(db, decisionId, 'REJECTED', by, now);
 }
