@@ -3,6 +3,8 @@
 import type { AgReportState } from 'ag-studio';
 import { AgStudio, AgStudioProvider } from 'ag-studio-react';
 import type { AuditRow } from '@/lib/types';
+import { guardrailsTheme } from '../studio-theme';
+
 
 const COLUMNS = [
   'createdAt',
@@ -39,8 +41,9 @@ const initialState: AgReportState = {
 export default function StudioClient({ rows }: { rows: AuditRow[] }) {
   return (
     <AgStudioProvider licenseKey={process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY}>
-      <div style={{ height: '85vh', width: '100%' }}>
+      <div style={{ height: 'calc(100vh - 57px)', width: '100%' }}>
         <AgStudio
+          theme={guardrailsTheme}
           data={{ sources: [{ id: 'audit', data: rows }] }}
           initialState={initialState}
           mode="view"
