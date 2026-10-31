@@ -13,17 +13,17 @@ export default function DecisionButtons({ id }: { id: string }) {
     <div>
       <div className="flex gap-2">
         <form action={approve}>
-          <button disabled={busy} className="rounded bg-green-700 px-3 py-1 text-white disabled:opacity-50">
+          <button disabled={busy} className="h-8 bg-allow px-3 text-sm font-medium text-background hover:brightness-110 disabled:opacity-50">
             {approving ? 'Paying…' : 'Approve'}
           </button>
         </form>
         <form action={reject}>
-          <button disabled={busy} className="rounded bg-red-700 px-3 py-1 text-white disabled:opacity-50">
+          <button disabled={busy} className="h-8 bg-deny px-3 text-sm font-medium text-background hover:brightness-110 disabled:opacity-50">
             Reject
           </button>
         </form>
       </div>
-      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="mt-2 text-sm text-deny">{error}</p>}
     </div>
   );
 }

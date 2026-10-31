@@ -4,7 +4,7 @@ import type { AgReportState } from 'ag-studio';
 import { AgStudio, AgStudioProvider } from 'ag-studio-react';
 import type { AuditRow } from '@/lib/types';
 import { guardrailsTheme } from '../studio-theme';
-
+import { auditFields } from '../audit-fields';
 
 const COLUMNS = [
   'createdAt',
@@ -63,7 +63,7 @@ export default function StudioClient({ rows }: { rows: AuditRow[] }) {
       <div style={{ height: 'calc(100vh - 57px)', width: '100%' }}>
         <AgStudio
           theme={guardrailsTheme}
-          data={{ sources: [{ id: 'audit', data: rows }] }}
+          data={{ sources: [{ id: 'audit', data: rows, fields: auditFields }] }}
           initialState={initialState}
           mode="view"
           style={{ height: '100%' }}
