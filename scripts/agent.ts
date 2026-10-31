@@ -1,5 +1,6 @@
 import { InvalidProposalError, runAgentTurn } from '../lib/agent/propose';
 import { getDb } from '../lib/db';
+import { executeDecision } from '../lib/executor';
 import { DEMO_AGENT_ID } from '../lib/policy/demo';
 
 async function main() {
@@ -25,6 +26,10 @@ async function main() {
       console.log(`  Verdict   ${verdict.decision}  (rule: ${verdict.ruleId})`);
       console.log(`  Reason    ${verdict.reason}`);
       console.log(`  Saved     audit entry ${id}`);
+      if (verdict.decision === 'ALLOW') {
+        const { execution } = await executeDecision(db, id);
+        console.log(`  Paid      PayPal order ${execution?.paypalOrderId} (${execution?.status})`);
+      }
     } catch (err) {
       const label = err instanceof InvalidProposalError ? 'Rejected before policy' : 'Error';
       console.log(`  ${label}: ${(err as Error).message}`);
