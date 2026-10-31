@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type Database from 'better-sqlite3';
-import { getAuditEntry, recordDecision, resolveApproval } from './db/queries';
+import { getAuditEntry, getAuditRows, recordDecision, resolveApproval } from './db/queries';
 import { openDatabase } from './db/schema';
 import { approveAndExecute, ExecutionError, executeDecision, rejectDecision } from './executor';
 import { payForProposal } from './paypal';
@@ -78,6 +78,18 @@ describe('executeDecision', () => {
     pay.mockResolvedValueOnce({ ...PAID, status: 'DECLINED' });
     await expect(executeDecision(db, 'd1')).rejects.toThrow('status DECLINED');
     expect(getAuditEntry(db, 'd1')?.execution).toBeUndefined();
+  });
+
+  it('logs each failure, shows the latest on the row, and a retry can still pay', async () => {
+    decide('d1', 'ESCALATE');
+    pay.mockRejectedValueOnce(new Error('down'));
+    await expect(approveAndExecute(db, 'd1', 'demo-user', LATER)).rejects.toThrow('down');
+    const row = () => getAuditRows(db, LATER).find((r) => r.id === 'd1')!;
+    expect(row()).toMatchObject({ status: 'AWAITING_EXECUTION', paymentError: 'PayPal payment failed: down' });
+
+    expect((await executeDecision(db, 'd1')).execution).toEqual(PAID);
+    expect(row().status).toBe('EXECUTED');
+    expect(() => db.prepare('DELETE FROM payment_failures').run()).toThrow('append-only');
   });
 });
 

@@ -103,5 +103,6 @@ export type AuditRow = {
   paypalOrderId: string | null;
   executionStatus: string | null;
   capturedAt: string | null;
+  paymentError: string | null;
   status: AuditStatus;
 };

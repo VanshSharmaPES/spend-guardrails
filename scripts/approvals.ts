@@ -1,9 +1,9 @@
 import { getDb } from '../lib/db';
 import { getPendingApprovals } from '../lib/db/queries';
-import { approveAndExecute, rejectDecision } from '../lib/executor';
+import { approveAndExecute, executeDecision, rejectDecision } from '../lib/executor';
 
 const USER = 'demo-user';
-const USAGE = 'Usage: npm run approvals -- list | approve <id> | reject <id>';
+const USAGE = 'Usage: npm run approvals -- list | approve <id> | reject <id> | retry <id>';
 
 async function main() {
   const [command, id] = process.argv.slice(2);
@@ -21,6 +21,9 @@ async function main() {
   } else if (command === 'reject' && id) {
     rejectDecision(db, id, USER);
     console.log('Rejected. No payment made.');
+  } else if (command === 'retry' && id) {
+    const { execution } = await executeDecision(db, id);
+    console.log(`Paid PayPal order ${execution?.paypalOrderId} (${execution?.status})`);
   } else {
     console.error(USAGE);
     process.exitCode = 1;

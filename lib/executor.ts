@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { getAuditEntry, recordExecution, resolveApproval } from './db/queries';
+import { getAuditEntry, recordExecution, recordPaymentFailure, resolveApproval } from './db/queries';
 import { payForProposal } from './paypal';
 import type { AuditEntry } from './types';
 
@@ -16,14 +16,19 @@ export async function executeDecision(db: Database.Database, decisionId: string)
   const approved = decision === 'ALLOW' || (decision === 'ESCALATE' && entry.humanAction?.decision === 'APPROVED');
   if (!approved) throw new ExecutionError(`Decision ${decisionId} is not approved for payment`);
 
+  const fail = (reason: string) => {
+    recordPaymentFailure(db, decisionId, reason, new Date().toISOString());
+    return new ExecutionError(reason);
+  };
+
   let payment;
   try {
     payment = await payForProposal(entry.proposal, decisionId);
   } catch (err) {
-    throw new ExecutionError(`PayPal payment failed: ${(err as Error).message}`);
+    throw fail(`PayPal payment failed: ${(err as Error).message}`);
   }
   if (!SUCCESSFUL_CAPTURES.includes(payment.status)) {
-    throw new ExecutionError(`PayPal did not capture the payment: status ${payment.status}`);
+    throw fail(`PayPal did not capture the payment: status ${payment.status}`);
   }
   return recordExecution(db, decisionId, payment);
 }

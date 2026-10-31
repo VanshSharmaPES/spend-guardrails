@@ -184,6 +184,10 @@ export function recordExecution(
   return getAuditEntry(db, decisionId)!;
 }
 
+export function recordPaymentFailure(db: Database.Database, decisionId: string, reason: string, at: string): void {
+  db.prepare('INSERT INTO payment_failures (decision_id, reason, at) VALUES (?, ?, ?)').run(decisionId, reason, at);
+}
+
 export function savePolicy(db: Database.Database, policy: Policy, now: string): void {
   db.prepare(
     `INSERT INTO policies (agent_id, id, rules_json, updated_at) VALUES (?, ?, ?, ?)

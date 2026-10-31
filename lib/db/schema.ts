@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const APPEND_ONLY_TABLES = ['decisions', 'human_actions', 'executions'];
+const APPEND_ONLY_TABLES = ['decisions', 'human_actions', 'executions', 'payment_failures'];
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS decisions (
@@ -41,6 +41,13 @@ CREATE TABLE IF NOT EXISTS executions (
   captured_at     TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS payment_failures (
+  id          INTEGER PRIMARY KEY,
+  decision_id TEXT NOT NULL REFERENCES decisions (id),
+  reason      TEXT NOT NULL,
+  at          TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS policies (
   agent_id   TEXT PRIMARY KEY,
   id         TEXT NOT NULL,
@@ -75,7 +82,8 @@ WHEN NOT EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'execution requires an ALLOW verdict or a human approval'); END;
 
-CREATE VIEW IF NOT EXISTS audit_rows AS
+DROP VIEW IF EXISTS audit_rows;
+CREATE VIEW audit_rows AS
 SELECT
   d.id,
   d.agent_id                 AS agentId,
@@ -97,6 +105,7 @@ SELECT
   e.paypal_order_id          AS paypalOrderId,
   e.status                   AS executionStatus,
   e.captured_at              AS capturedAt,
+  (SELECT f.reason FROM payment_failures f WHERE f.decision_id = d.id ORDER BY f.id DESC LIMIT 1) AS paymentError,
   CASE
     WHEN e.decision_id IS NOT NULL THEN 'EXECUTED'
     WHEN d.decision = 'DENY' THEN 'DENIED'
