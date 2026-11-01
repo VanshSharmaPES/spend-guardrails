@@ -60,7 +60,7 @@ const paymentsClient = new Client({
     oAuthClientId: process.env.PAYPAL_CLIENT_ID!,
     oAuthClientSecret: process.env.PAYPAL_SECRET!,
   },
-  timeout: 0,
+  timeout: 15000,
   environment: Environment.Sandbox,
 });
 

@@ -1,7 +1,8 @@
 import { connection } from 'next/server';
 import { getDb } from '@/lib/db';
-import { getPendingApprovals } from '@/lib/db/queries';
+import { getAuditRows, getPendingApprovals } from '@/lib/db/queries';
 import DecisionButtons from './decision-buttons';
+import RetryButton from './retry-button';
 
 function timeLeft(expiresAtMs: number, nowMs: number) {
   const minutes = Math.max(0, Math.floor((expiresAtMs - nowMs) / 60_000));
@@ -12,6 +13,7 @@ export default async function ApprovalsPage() {
   await connection();
   const now = new Date();
   const pending = getPendingApprovals(getDb(), now.toISOString());
+  const failed = getAuditRows(getDb(), now.toISOString()).filter((row) => row.status === 'AWAITING_EXECUTION');
 
   return (
     <main className="w-full px-6 py-8">
@@ -21,7 +23,27 @@ export default async function ApprovalsPage() {
           {pending.length} waiting. No answer within 24 hours denies the purchase.
         </p>
       </div>
-
+            {failed.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-2 text-sm font-medium text-deny">Payment failed</h2>
+          <ul className="border-t border-line">
+            {failed.map((row) => (
+              <li key={row.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-8 border-b border-line py-4">
+                <div className="min-w-0">
+                  <p className="font-medium">{row.merchant}</p>
+                  <p className="truncate text-sm text-muted" title={row.paymentError ?? undefined}>
+                    {row.paymentError ?? 'Approved, but payment has not gone through.'}
+                  </p>
+                </div>
+                <p className="text-right font-mono tabular-nums">
+                  {row.amountValue} <span className="text-xs text-muted">{row.amountCurrency}</span>
+                </p>
+                <RetryButton id={row.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {pending.length === 0 ? (
         <p className="border-y border-line py-12 text-center text-sm text-muted">
           Nothing to review. Escalated purchases will appear here.
