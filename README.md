@@ -1,184 +1,106 @@
 # Spend Guardrails
 
-Deterministic spend guardrails for AI agents. An LLM agent proposes a purchase; a
-policy engine decides ALLOW / DENY / ESCALATE; approved transactions execute
-through the PayPal sandbox; every decision is logged with the rule that produced
-it.
+Deterministic spend guardrails for AI agents. An LLM agent proposes a purchase, a
+policy engine returns ALLOW, DENY or ESCALATE, and only approved purchases are paid
+through the PayPal sandbox. Every decision is logged with the rule that produced it.
 
 > The agent is probabilistic. The guardrail must not be.
 
-No LLM sits in the approval path — the policy engine is plain deterministic code.
-An LLM may appear in the analysis/query layer only.
+No LLM sits in the approval path. The policy engine is plain code, so the same
+proposal, history and policy always produce the same verdict.
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com).
 
+## How it works
+
+1. **Propose.** The agent turns a goal into items from a fixed catalogue. Merchant,
+   category and price come from the catalogue, never from the model's text.
+2. **Decide.** The policy engine checks the proposal against the agent's rules and
+   recent history.
+3. **Act.**
+   - ALLOW pays through PayPal.
+   - DENY stops the purchase.
+   - ESCALATE waits for a person. No answer within 24 hours denies it.
+4. **Record.** Decisions go into an append-only SQLite log, enforced by database
+   triggers. A trigger also refuses any payment without an ALLOW verdict or a human
+   approval.
+
+## Demo policy
+
+| Rule | Limit | Outcome |
+|---|---|---|
+| Review cap | Over 100 USD per transaction | ESCALATE |
+| Hard cap | Over 1000 USD per transaction | DENY |
+| Rolling spend | Over 500 USD a day or 2000 USD a week | ESCALATE |
+| Merchant denylist | Daily Grind | DENY |
+| Velocity | More than 5 purchases an hour | DENY |
+
+The full policy, including category rules, is in
+[`lib/policy/demo.ts`](lib/policy/demo.ts).
+
 ## Setup
 
-Requires Node.js 20.9 or later and a PayPal sandbox REST app
-([developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox)).
-The Transaction Search pages also need the app's **Transaction search** feature
-enabled.
+You need Node.js 20.9 or later and:
+
+- a PayPal sandbox REST app on a **US** sandbox business account
+- a [Groq](https://console.groq.com) API key
+- an [AG Studio](https://www.ag-grid.com) licence key
 
 ```bash
 npm install
-cp env.example .env.local   # then fill in PAYPAL_CLIENT_ID and PAYPAL_SECRET
+cp env.example .env.local   # then fill in your keys
+npm run seed                # load demo history
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Next.js only loads the dotted
-`.env.local`; it is git-ignored, so credentials stay out of the repo.
+Open [http://localhost:3000](http://localhost:3000). `.env.local` is git-ignored.
+`NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` is sent to the browser. The database defaults to
+`data/guardrails.db`; set `DATABASE_PATH` to change it.
 
-Other scripts: `npm run build` (production build), `npm run start` (serve the
-build), `npm run lint`.
+## Try it
 
-## How it works
-
-Every PayPal SDK call lives in [`lib/paypal.ts`](lib/paypal.ts), which owns the
-sandbox `Client`. Each page is a server component that calls one of those
-functions and renders the result with [`app/data-table.tsx`](app/data-table.tsx).
-Pages call `await connection()` so they render per request with live data instead
-of being prerendered at build time.
-
-## Data pages
-
-| Page | `lib/paypal.ts` function | SDK call | Shows |
-|---|---|---|---|
-| [`/transactions`](app/transactions/page.tsx) | `getRecentTransactions()` | `TransactionSearchController.searchTransactions` | First 20 transactions from the last 30 days |
-| [`/subscriptions`](app/subscriptions/page.tsx) | `getBillingPlans()` | `SubscriptionsController.listBillingPlans` | First 20 subscription billing plans |
-| [`/balances`](app/balances/page.tsx) | `getBalances()` | `TransactionSearchController.searchBalances` | Current balance per currency |
-
-The examples below are real sandbox responses as the SDK returns them (camelCase
-fields, not the REST API's snake_case).
-
-### `/transactions`
-
-`searchTransactions({ startDate, endDate, fields: 'all', pageSize: 20 })` returns
-`transactionDetails[]`. Transaction Search accepts at most a 31-day range, and new
-activity can take up to three hours to appear. `fields: 'all'` adds `payerInfo`
-and the other sections; without it only `transactionInfo` is returned.
-
-One `transactionDetails` item (a payout):
-
-```json
-{
-  "transactionInfo": {
-    "transactionId": "10890159B0554833L",
-    "paypalReferenceId": "1FX78001X2681601H",
-    "paypalReferenceIdType": "TXN",
-    "transactionEventCode": "T0001",
-    "transactionInitiationDate": "2026-09-23T12:11:56Z",
-    "transactionUpdatedDate": "2026-09-23T12:11:56Z",
-    "transactionAmount": { "currencyCode": "USD", "value": "-1.00" },
-    "feeAmount": { "currencyCode": "USD", "value": "-0.25" },
-    "transactionStatus": "P",
-    "transactionSubject": "Probe payout",
-    "transactionNote": "probe",
-    "endingBalance": { "currencyCode": "USD", "value": "4997.50" },
-    "availableBalance": { "currencyCode": "USD", "value": "4997.50" },
-    "customField": "probe-1",
-    "protectionEligibility": "02",
-    "instrumentType": "PayPal",
-    "instrumentSubType": "PayPal Wallet"
-  },
-  "payerInfo": {
-    "emailAddress": "probe-receiver@example.com",
-    "phoneNumber": { "countryCode": "1", "nationalNumber": "2028188144" },
-    "addressStatus": "N",
-    "payerName": {}
-  },
-  "shippingInfo": { "name": "John, Doe" },
-  "cartInfo": {},
-  "storeInfo": {},
-  "auctionInfo": {},
-  "incentiveInfo": {}
-}
+```bash
+npm run agent -- "Buy printer paper for the office"
+npm run approvals -- list
+npm run approvals -- approve <id>
 ```
 
-`transactionEventCode` is a [PayPal T-code](https://developer.paypal.com/docs/transaction-search/transaction-event-codes/)
-(`T0001` = payout). `transactionStatus` is `S` success, `P` pending, `D` denied,
-`V` reversed or `F` partially refunded.
+`npm run approvals` also accepts `reject <id>` and `retry <id>`.
 
-### `/subscriptions`
+## Pages
 
-`listBillingPlans({ pageSize: 20, prefer: 'return=representation' })` returns
-`plans[]`. The `prefer` header makes the list include `billingCycles` and
-`paymentPreferences`, which the default list response omits.
+| Page | Shows |
+|---|---|
+| `/approvals` | Escalated purchases to approve or reject, and failed payments to retry |
+| `/history` | The full audit log, with filters |
+| `/spend` | Paid purchases by category, merchant, agent and day |
+| `/transactions`, `/subscriptions`, `/balances` | Live PayPal sandbox data |
 
-One `plans` item (a plan with a 30-day trial):
+`/transactions` and `/balances` need the app's **Transaction search** feature enabled.
 
-```json
-{
-  "id": "P-3RM52651TF551181NNKZ4BHQ",
-  "productId": "AGGRID-CLOUD-STORAGE",
-  "name": "Cloud Storage Basic (100 GB)",
-  "status": "ACTIVE",
-  "description": "Cloud Storage: Cloud Storage Basic (100 GB)",
-  "billingCycles": [
-    {
-      "frequency": { "intervalUnit": "DAY", "intervalCount": 30 },
-      "tenureType": "TRIAL",
-      "sequence": 1,
-      "totalCycles": 1
-    },
-    {
-      "pricingScheme": {
-        "version": 1,
-        "fixedPrice": { "currencyCode": "USD", "value": "2.99" },
-        "createTime": "2026-09-23T12:05:50Z",
-        "updateTime": "2026-09-23T12:05:50Z"
-      },
-      "frequency": { "intervalUnit": "MONTH", "intervalCount": 1 },
-      "tenureType": "REGULAR",
-      "sequence": 2,
-      "totalCycles": 0
-    }
-  ],
-  "paymentPreferences": {
-    "autoBillOutstanding": true,
-    "setupFee": { "currencyCode": "USD", "value": "0.0" },
-    "setupFeeFailureAction": "CONTINUE",
-    "paymentFailureThreshold": 3
-  },
-  "quantitySupported": false,
-  "createTime": "2026-09-23T12:05:50Z",
-  "updateTime": "2026-09-23T12:05:50Z",
-  "links": [
-    {
-      "href": "https://api.sandbox.paypal.com/v1/billing/plans/P-3RM52651TF551181NNKZ4BHQ",
-      "rel": "self",
-      "method": "GET"
-    }
-  ]
-}
-```
+## Failed payments
 
-`totalCycles: 0` on the `REGULAR` cycle means the plan bills until cancelled.
+An approval is recorded before the payment is attempted. If PayPal fails, the
+failure is logged and the purchase moves to **Payment failed** on `/approvals`.
+Retries reuse the decision ID as PayPal's request ID, so a retry cannot charge twice.
 
-### `/balances`
+## Limitations
 
-`searchBalances({})` returns the current balances. Pass `asOfTime` to get the
-balance at an earlier point in time.
+- Sandbox only. Payments use PayPal's public test card and move no real money.
+- There is no login. Anyone who can open a deployment can approve its purchases, so
+  it should hold demo data only.
 
-```json
-{
-  "balances": [
-    {
-      "currency": "USD",
-      "totalBalance": { "currencyCode": "USD", "value": "3537.71" },
-      "availableBalance": { "currencyCode": "USD", "value": "3537.71" },
-      "withheldBalance": { "currencyCode": "USD", "value": "0.00" }
-    }
-  ],
-  "accountId": "QXJYHKET9Y4VC",
-  "asOfTime": "2026-09-28T10:59:59Z",
-  "lastRefreshTime": "2026-09-28T10:59:59Z"
-}
+## Development
+
+```bash
+npm test
+npm run lint
+npm run build
 ```
 
 ## Credits
 
-Scaffolded from [paypaldev/hackathon-paypal-ag-grid-boilerplate](https://github.com/paypaldev/hackathon-paypal-ag-grid-boilerplate),
-a plain Next.js + PayPal SDK starter with an HTML table.
+Scaffolded from [paypaldev/hackathon-paypal-ag-grid-boilerplate](https://github.com/paypaldev/hackathon-paypal-ag-grid-boilerplate).
 
 ## License
 
