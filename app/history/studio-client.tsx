@@ -6,51 +6,43 @@ import type { AuditRow } from '@/lib/types';
 import { guardrailsTheme } from '../studio-theme';
 import { auditFields } from '../audit-fields';
 
-const COLUMNS = [
-  'createdAt',
-  'status',
-  'decision',
-  'merchant',
-  'category',
-  'amountHome',
-  'ruleId',
-  'reason',
-  'agentId',
-  'paypalOrderId',
-];
+const COLUMNS = ['createdAt', 'status', 'merchant', 'amountHome', 'ruleId', 'reason', 'paypalOrderId'];
+
+const title = (text: string) => ({ title: { enabled: true, text } });
 
 const initialState: AgReportState = {
   pages: [
     {
       id: 'history',
-            widgets: {
+      layout: { rowHeight: 14, pagePadding: 12, widgetPadding: 8 },
+      widgets: {
         'status-filter': {
           type: 'list-filter',
-          format: { title: { enabled: true, text: 'Status' } },
+          format: title('Status'),
           dataMapping: { value: [{ id: 'audit.status' }] },
         },
         'decision-filter': {
           type: 'list-filter',
-          format: { title: { enabled: true, text: 'Decision' } },
+          format: title('Verdict'),
           dataMapping: { value: [{ id: 'audit.decision' }] },
         },
         'merchant-filter': {
           type: 'list-filter',
-          format: { title: { enabled: true, text: 'Merchant' } },
+          format: title('Merchant'),
           dataMapping: { value: [{ id: 'audit.merchant' }] },
         },
         'audit-log': {
           type: 'grid',
-          format: { title: { enabled: true, text: 'Transaction history' } },
+          format: { ...title('Every decision, with the rule that made it'), style: { columnAutoSize: true } },
           dataMapping: { cols: COLUMNS.map((name) => ({ id: `audit.${name}` })) },
           sort: [{ field: { id: 'audit.createdAt' }, direction: 'desc' }],
         },
       },
       widgetLayout: {
-        'status-filter': { xTrack: 0, yTrack: 0, xSpan: 4, ySpan: 12 },
-        'decision-filter': { xTrack: 0, yTrack: 12, xSpan: 4, ySpan: 10 },
-        'merchant-filter': { xTrack: 0, yTrack: 22, xSpan: 4, ySpan: 14 },
-        'audit-log': { xTrack: 4, yTrack: 0, xSpan: 20, ySpan: 36 },
+        'status-filter': { xTrack: 0, yTrack: 0, xSpan: 5, ySpan: 15 },
+        'decision-filter': { xTrack: 0, yTrack: 15, xSpan: 5, ySpan: 10 },
+        'merchant-filter': { xTrack: 0, yTrack: 25, xSpan: 5, ySpan: 19 },
+        'audit-log': { xTrack: 5, yTrack: 0, xSpan: 19, ySpan: 44 },
       },
     },
   ],
@@ -65,6 +57,7 @@ export default function StudioClient({ rows }: { rows: AuditRow[] }) {
           theme={guardrailsTheme}
           data={{ sources: [{ id: 'audit', data: rows, fields: auditFields }] }}
           initialState={initialState}
+          panels={{ view: { right: [] } }}
           mode="view"
           style={{ height: '100%' }}
         />

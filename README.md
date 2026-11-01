@@ -74,7 +74,7 @@ npm run approvals -- approve <id>
 | `/approvals` | Escalated purchases to approve or reject, and failed payments to retry |
 | `/history` | The full audit log, with filters |
 | `/spend` | Paid purchases by category, merchant, agent and day |
-| `/transactions`, `/subscriptions`, `/balances` | Live PayPal sandbox data |
+| `/transactions`, `/balances` | Live PayPal sandbox data |
 
 `/transactions` and `/balances` need the app's **Transaction search** feature enabled.
 

@@ -30,7 +30,10 @@ export default function Nav() {
           </Link>
         ))}
       </div>
-      <span className="ml-auto flex items-center font-mono text-xs text-muted">PayPal sandbox</span>
+      <span className="ml-auto flex items-center gap-2 font-mono text-xs text-muted">
+        <span className="size-1.5 rounded-full bg-allow" />
+        PayPal sandbox
+      </span>
     </nav>
   );
 }
