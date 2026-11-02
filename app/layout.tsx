@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "./nav";
+import { getSession } from "@/lib/auth/server";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 
 const plexSans = IBM_Plex_Sans({ variable: "--font-plex-sans", subsets: ["latin"], weight: ["400", "500", "600"] });
@@ -22,13 +23,18 @@ export const metadata: Metadata = {
   description: "Deterministic spend guardrails for AI agents",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const session = await getSession();
   return (
     <html
       lang="en"
       className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col"><Nav />{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Nav user={session && { email: session.email, role: session.role }} />
+        {children}
+      </body>
     </html>
   );
 }
+
