@@ -73,6 +73,7 @@ export type Policy = {
 export type AuditEntry = {
   id: string;
   proposal: PurchaseProposal;
+  goal?: string;
   verdict: PolicyVerdict;
   humanAction?: { by: string; decision: 'APPROVED' | 'REJECTED' | 'EXPIRED'; at: string };
   execution?: { paypalOrderId: string; status: string; capturedAt: string };
@@ -95,6 +96,7 @@ export type AuditRow = {
   ruleId: string;
   reason: string;
   rationale: string;
+  goal: string | null;
   createdAt: string;
   expiresAt: string | null;
   humanAction: 'APPROVED' | 'REJECTED' | 'EXPIRED' | null;

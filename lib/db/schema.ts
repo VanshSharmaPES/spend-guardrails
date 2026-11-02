@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS decisions (
   home_currency     TEXT NOT NULL,
   items_json        TEXT NOT NULL,
   rationale         TEXT NOT NULL,
+  goal              TEXT,
   proposed_at       TEXT NOT NULL,
   decision          TEXT NOT NULL CHECK (decision IN ('ALLOW', 'DENY', 'ESCALATE')),
   rule_id           TEXT NOT NULL,
@@ -97,6 +98,7 @@ SELECT
   d.rule_id                  AS ruleId,
   d.reason,
   d.rationale,
+  d.goal,
   d.created_at               AS createdAt,
   d.expires_at               AS expiresAt,
   h.action                   AS humanAction,
@@ -119,11 +121,19 @@ LEFT JOIN human_actions h ON h.decision_id = d.id
 LEFT JOIN executions e ON e.decision_id = d.id;
 `;
 
+function addGoalColumn(db: Database.Database): void {
+  const columns = db.prepare("SELECT name FROM pragma_table_info('decisions')").all() as { name: string }[];
+  if (columns.length > 0 && !columns.some((c) => c.name === 'goal')) {
+    db.exec('ALTER TABLE decisions ADD COLUMN goal TEXT');
+  }
+}
+
 export function openDatabase(path = process.env.DATABASE_PATH ?? 'data/guardrails.db'): Database.Database {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  addGoalColumn(db);
   db.exec(SCHEMA);
   return db;
 }

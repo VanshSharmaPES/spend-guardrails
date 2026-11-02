@@ -17,6 +17,7 @@ type Row = {
   amount_home_cents: number;
   items_json: string;
   rationale: string;
+  goal: string | null,
   proposed_at: string;
   decision: Decision;
   rule_id: string;
@@ -54,6 +55,7 @@ function toEntry(row: Row): AuditEntry {
       rationale: row.rationale,
       proposedAt: row.proposed_at,
     },
+    goal: row.goal ?? undefined,
     verdict: { decision: row.decision, ruleId: row.rule_id, reason: row.reason, evaluatedAt: row.evaluated_at },
     humanAction: row.h_action ? { by: row.h_by!, decision: row.h_action, at: row.h_at! } : undefined,
     execution: row.e_order_id
@@ -72,12 +74,13 @@ export function recordDecision(
   proposal: PurchaseProposal,
   verdict: PolicyVerdict,
   homeCurrency = 'USD',
+  goal?: string,
 ): AuditEntry {
   const createdAt = verdict.evaluatedAt;
   db.prepare(
     `INSERT INTO decisions (id, agent_id, merchant, category, amount_value, amount_currency, amount_home_cents,
-       home_currency, items_json, rationale, proposed_at, decision, rule_id, reason, evaluated_at, expires_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       home_currency, items_json, rationale, goal, proposed_at, decision, rule_id, reason, evaluated_at, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     proposal.id,
     proposal.agentId,
@@ -89,6 +92,7 @@ export function recordDecision(
     homeCurrency,
     JSON.stringify(proposal.items),
     proposal.rationale,
+    goal ?? null,
     proposal.proposedAt,
     verdict.decision,
     verdict.ruleId,

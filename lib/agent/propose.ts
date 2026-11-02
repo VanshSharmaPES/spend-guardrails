@@ -53,7 +53,8 @@ async function askModel(goal: string): Promise<AgentPick> {
     .map((i) => `- ${i.sku} | ${i.name} | ${i.category} | ${i.merchant} | ${i.price.value} ${i.price.currencyCode}`)
     .join('\n');
 
-  const res = await fetch(GROQ_URL, {
+    const res = await fetch(GROQ_URL, {
+    signal: AbortSignal.timeout(20_000),
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -137,6 +138,6 @@ export async function runAgentTurn(
   const proposal = await proposePurchase(goal, { agentId: opts.agentId, homeCurrency: opts.homeCurrency, now });
   const nowIso = now.toISOString();
   const verdict = evaluate(proposal, { history: getHistory(db, opts.agentId, nowIso), now: nowIso }, policy);
-  return recordDecision(db, proposal, verdict, opts.homeCurrency);
+  return recordDecision(db, proposal, verdict, opts.homeCurrency, goal);
 }
 

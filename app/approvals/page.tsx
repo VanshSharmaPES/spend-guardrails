@@ -4,6 +4,8 @@ import { getAuditRows, getPendingApprovals } from '@/lib/db/queries';
 import type { AuditRow } from '@/lib/types';
 import DecisionButtons from './decision-buttons';
 import RetryButton from './retry-button';
+import AgentConsole from './agent-console';
+import { claimsApproval } from '@/lib/agent/claims';
 
 const DAY_MS = 86_400_000;
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -55,6 +57,7 @@ export default async function ApprovalsPage() {
           person, and no answer within 24 hours denies it.
         </p>
       </header>
+      <AgentConsole />
 
       <section className="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Awaiting review" value={String(pending.length)} detail="Escalated by policy" tone="border-l-review" />
@@ -96,7 +99,7 @@ export default async function ApprovalsPage() {
           </p>
         ) : (
           <ul className="space-y-2">
-            {pending.map(({ id, proposal, verdict, createdAt }) => (
+            {pending.map(({ id, proposal, verdict, createdAt, goal }) => (
               <li
                 key={id}
                 className="grid grid-cols-[1fr_auto] items-center gap-x-8 gap-y-2 border border-line border-l-2 border-l-review bg-surface px-4 py-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_8rem_6rem_auto]"
@@ -106,6 +109,16 @@ export default async function ApprovalsPage() {
                   <p className="truncate text-sm text-muted">
                     {proposal.items.map((i) => `${i.qty} × ${i.name}`).join(', ')}
                   </p>
+                                    {goal && (
+                    <p className="mt-1 truncate text-xs text-muted" title={goal}>
+                      Agent was told: &ldquo;{goal}&rdquo;
+                    </p>
+                  )}
+                  {claimsApproval(goal) && (
+                    <p className="mt-1 text-xs font-medium text-review">
+                      Claims prior approval. Verify before approving.
+                    </p>
+                  )}
                 </div>
                 <p className="text-sm">
                   <span className="mr-2 border border-review/40 px-1.5 py-0.5 font-mono text-xs text-review">
