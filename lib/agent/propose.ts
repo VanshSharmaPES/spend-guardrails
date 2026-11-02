@@ -129,7 +129,7 @@ export async function proposePurchase(
 export async function runAgentTurn(
   db: Database.Database,
   goal: string,
-  opts: { agentId: string; homeCurrency?: string },
+  opts: { agentId: string; homeCurrency?: string; requestedBy?: string },
 ): Promise<AuditEntry> {
   const policy = getPolicy(db, opts.agentId);
   if (!policy) throw new Error(`No policy configured for agent ${opts.agentId}`);
@@ -138,6 +138,6 @@ export async function runAgentTurn(
   const proposal = await proposePurchase(goal, { agentId: opts.agentId, homeCurrency: opts.homeCurrency, now });
   const nowIso = now.toISOString();
   const verdict = evaluate(proposal, { history: getHistory(db, opts.agentId, nowIso), now: nowIso }, policy);
-  return recordDecision(db, proposal, verdict, opts.homeCurrency, goal);
+  return recordDecision(db, proposal, verdict, opts.homeCurrency, { goal, requestedBy: opts.requestedBy });
 }
 

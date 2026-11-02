@@ -6,6 +6,8 @@ import DecisionButtons from './decision-buttons';
 import RetryButton from './retry-button';
 import AgentConsole from './agent-console';
 import { claimsApproval } from '@/lib/agent/claims';
+import { getSession } from '@/lib/auth/server';
+
 
 const DAY_MS = 86_400_000;
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -39,6 +41,8 @@ function SectionTitle({ dot, label, count }: { dot: string; label: string; count
 
 export default async function ApprovalsPage() {
   await connection();
+  const session = await getSession();
+  const isApprover = session?.role === 'approver';
   const now = new Date();
   const db = getDb();
   const pending = getPendingApprovals(db, now.toISOString());
@@ -84,7 +88,11 @@ export default async function ApprovalsPage() {
                 <p className="text-right font-mono tabular-nums">
                   {row.amountValue} <span className="text-xs text-muted">{row.amountCurrency}</span>
                 </p>
-                <RetryButton id={row.id} />
+                {isApprover ? (
+                  <RetryButton id={row.id} />
+                ) : (
+                  <p className="text-xs text-muted">An approver can retry</p>
+                )}
               </li>
             ))}
           </ul>
@@ -99,7 +107,7 @@ export default async function ApprovalsPage() {
           </p>
         ) : (
           <ul className="space-y-2">
-            {pending.map(({ id, proposal, verdict, createdAt, goal }) => (
+            {pending.map(({ id, proposal, verdict, createdAt, goal, requestedBy }) => (
               <li
                 key={id}
                 className="grid grid-cols-[1fr_auto] items-center gap-x-8 gap-y-2 border border-line border-l-2 border-l-review bg-surface px-4 py-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_8rem_6rem_auto]"
@@ -109,7 +117,7 @@ export default async function ApprovalsPage() {
                   <p className="truncate text-sm text-muted">
                     {proposal.items.map((i) => `${i.qty} × ${i.name}`).join(', ')}
                   </p>
-                                    {goal && (
+                  {goal && (
                     <p className="mt-1 truncate text-xs text-muted" title={goal}>
                       Agent was told: &ldquo;{goal}&rdquo;
                     </p>
@@ -119,6 +127,7 @@ export default async function ApprovalsPage() {
                       Claims prior approval. Verify before approving.
                     </p>
                   )}
+                  {requestedBy && <p className="mt-1 text-xs text-muted">Requested by {requestedBy}</p>}
                 </div>
                 <p className="text-sm">
                   <span className="mr-2 border border-review/40 px-1.5 py-0.5 font-mono text-xs text-review">
@@ -132,7 +141,13 @@ export default async function ApprovalsPage() {
                 <p className="text-right font-mono text-sm tabular-nums text-muted" title="Time left to decide">
                   {timeLeft(Date.parse(createdAt) + DAY_MS, now.getTime())}
                 </p>
-                <DecisionButtons id={id} />
+                {!isApprover ? (
+                  <p className="text-xs text-muted">Waiting for an approver</p>
+                ) : requestedBy === session?.email ? (
+                  <p className="text-xs text-muted">You requested this</p>
+                ) : (
+                  <DecisionButtons id={id} />
+                )}
               </li>
             ))}
           </ul>

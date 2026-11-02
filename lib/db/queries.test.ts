@@ -114,6 +114,21 @@ describe('getHistory', () => {
 });
 
 describe('approval queue', () => {
+  it('refuses an approval from the person who requested the purchase', () => {
+    const p = proposal();
+    recordDecision(db, p, verdict('ESCALATE'), 'USD', { requestedBy: 'approver@demo' });
+    expect(() => resolveApproval(db, p.id, 'APPROVED', 'approver@demo', at(1))).toThrow(ApprovalError);
+    expect(getAuditEntry(db, p.id)?.humanAction).toBeUndefined();
+  });
+
+  it('lets a different approver approve, and records who requested it', () => {
+    const p = proposal();
+    recordDecision(db, p, verdict('ESCALATE'), 'USD', { requestedBy: 'requester@demo' });
+    const entry = resolveApproval(db, p.id, 'APPROVED', 'approver@demo', at(1));
+    expect(entry.requestedBy).toBe('requester@demo');
+    expect(entry.humanAction?.by).toBe('approver@demo');
+  });
+
   it('approves a pending decision inside the window', () => {
     const p = proposal();
     recordDecision(db, p, verdict('ESCALATE'));

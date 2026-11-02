@@ -6,8 +6,9 @@ import { getDb } from '@/lib/db';
 import { approveAndExecute, executeDecision, rejectDecision } from '@/lib/executor';
 import { DEMO_AGENT_ID } from '@/lib/policy/demo';
 import type { AuditEntry } from '@/lib/types';
+import { requireRole, requireSession } from '@/lib/auth/server';
 
-const DEMO_USER = 'demo-user';
+
 const MAX_GOAL_LENGTH = 200;
 const RUN_WINDOW_MS = 60_000;
 const MAX_RUNS_PER_WINDOW = 10;
@@ -28,8 +29,9 @@ function refresh() {
 
 export async function decide(id: string, approve: boolean, _previous: string | null): Promise<string | null> {
   try {
-    if (approve) await approveAndExecute(getDb(), id, DEMO_USER);
-    else rejectDecision(getDb(), id, DEMO_USER);
+    const { email } = await requireRole('approver');
+    if (approve) await approveAndExecute(getDb(), id, email);
+    else rejectDecision(getDb(), id, email);
     return null;
   } catch (err) {
     return (err as Error).message;
@@ -40,6 +42,7 @@ export async function decide(id: string, approve: boolean, _previous: string | n
 
 export async function retryPayment(id: string, _previous: string | null): Promise<string | null> {
   try {
+    await requireRole('approver');
     await executeDecision(getDb(), id);
     return null;
   } catch (err) {
@@ -50,6 +53,8 @@ export async function retryPayment(id: string, _previous: string | null): Promis
 }
 
 export async function runGoal(_previous: AgentRun, form: FormData): Promise<AgentRun> {
+  const session = await requireSession().catch(() => null);
+  if (!session) return { ok: false, error: 'Your session has ended. Sign in again.' };
   const goal = String(form.get('goal') ?? '').trim();
   if (!goal) return { ok: false, error: 'Type a goal for the agent.' };
   if (goal.length > MAX_GOAL_LENGTH) return { ok: false, error: `Keep the goal under ${MAX_GOAL_LENGTH} characters.` };
@@ -63,7 +68,7 @@ export async function runGoal(_previous: AgentRun, form: FormData): Promise<Agen
 
   try {
     const db = getDb();
-    const entry = await runAgentTurn(db, goal, { agentId: DEMO_AGENT_ID });
+    const entry = await runAgentTurn(db, goal, { agentId: DEMO_AGENT_ID, requestedBy: session.email });
     if (entry.verdict.decision !== 'ALLOW') return { ok: true, entry };
     try {
       return { ok: true, entry: await executeDecision(db, entry.id) };

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS decisions (
   items_json        TEXT NOT NULL,
   rationale         TEXT NOT NULL,
   goal              TEXT,
+  requested_by      TEXT,
   proposed_at       TEXT NOT NULL,
   decision          TEXT NOT NULL CHECK (decision IN ('ALLOW', 'DENY', 'ESCALATE')),
   rule_id           TEXT NOT NULL,
@@ -99,6 +100,7 @@ SELECT
   d.reason,
   d.rationale,
   d.goal,
+  d.requested_by             AS requestedBy,
   d.created_at               AS createdAt,
   d.expires_at               AS expiresAt,
   h.action                   AS humanAction,
@@ -121,19 +123,22 @@ LEFT JOIN human_actions h ON h.decision_id = d.id
 LEFT JOIN executions e ON e.decision_id = d.id;
 `;
 
-function addGoalColumn(db: Database.Database): void {
+// Databases created before these columns existed lack them, and CREATE TABLE IF NOT EXISTS will not add them.
+function addMissingColumns(db: Database.Database): void {
   const columns = db.prepare("SELECT name FROM pragma_table_info('decisions')").all() as { name: string }[];
-  if (columns.length > 0 && !columns.some((c) => c.name === 'goal')) {
-    db.exec('ALTER TABLE decisions ADD COLUMN goal TEXT');
+  if (columns.length === 0) return;
+  for (const name of ['goal', 'requested_by']) {
+    if (!columns.some((c) => c.name === name)) db.exec(`ALTER TABLE decisions ADD COLUMN ${name} TEXT`);
   }
 }
+
 
 export function openDatabase(path = process.env.DATABASE_PATH ?? 'data/guardrails.db'): Database.Database {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
-  addGoalColumn(db);
+  addMissingColumns(db);
   db.exec(SCHEMA);
   return db;
 }
