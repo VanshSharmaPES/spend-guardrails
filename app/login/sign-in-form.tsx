@@ -3,10 +3,11 @@
 import { useActionState, useState } from 'react';
 import { DEMO_USERS } from '@/lib/auth/users';
 import { signIn } from './actions';
+import Link from 'next/link';
 
 const TONE = { requester: 'border-l-review', approver: 'border-l-allow' };
 
-const INPUT =
+export const INPUT =
   'mt-1 h-9 w-full border border-line bg-background px-3 text-sm normal-case tracking-normal text-foreground placeholder:text-muted focus:border-foreground focus:outline-none';
 
 export default function SignInForm() {
@@ -51,6 +52,12 @@ export default function SignInForm() {
           >
             {signingIn ? 'Signing in…' : 'Sign in'}
           </button>
+          <p className="mt-3 text-center text-sm text-muted">
+          No account?{' '}
+          <Link href="/signup" className="text-foreground underline-offset-4 hover:underline">
+            Create one
+          </Link>
+          </p>
         </form>
 
         <h2 className="mt-8 mb-3 text-xs uppercase tracking-wider text-muted">Demo accounts</h2>

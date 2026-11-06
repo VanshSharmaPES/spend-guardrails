@@ -49,7 +49,12 @@ CREATE TABLE IF NOT EXISTS payment_failures (
   reason      TEXT NOT NULL,
   at          TEXT NOT NULL
 );
-
+CREATE TABLE IF NOT EXISTS accounts (
+  email         TEXT PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  role          TEXT NOT NULL CHECK (role IN ('requester')),
+  created_at    TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS policies (
   agent_id   TEXT PRIMARY KEY,
   id         TEXT NOT NULL,
