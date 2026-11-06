@@ -6,7 +6,7 @@ import type { AuditRow } from '@/lib/types';
 import { guardrailsTheme } from '../studio-theme';
 import { auditFields } from '../audit-fields';
 
-const COLUMNS = ['createdAt', 'status', 'merchant', 'amountHome', 'ruleId', 'reason', 'paypalOrderId'];
+const COLUMNS = ['createdAt', 'status', 'merchant', 'amountHome', 'ruleId', 'reason', 'requestedBy', 'humanBy', 'paypalOrderId'];
 
 const title = (text: string) => ({ title: { enabled: true, text } });
 

@@ -14,5 +14,7 @@ export const auditFields: AgFieldDefinition[] = [
   text('ruleId', 'Rule'),
   text('reason', 'Reason'),
   text('agentId', 'Agent'),
+  text('requestedBy', 'Requested by'),
+  text('humanBy', 'Reviewed by'),
   text('paypalOrderId', 'PayPal order'),
 ];
