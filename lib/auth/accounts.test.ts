@@ -16,6 +16,17 @@ describe('accounts', () => {
     expect(authenticate(db, 'NEW.USER@example.com', 'long-password')).toEqual(account);
   });
 
+  it.each([
+    ["' OR '1'='1", "' OR '1'='1"],
+    ["approver@demo' --", 'anything'],
+    ['approver@demo', "' OR 1=1 --"],
+    ["a@example.com'; DROP TABLE accounts; --", 'long-password'],
+  ])('refuses SQL injection attempts (%s / %s)', (email, password) => {
+    createAccount(db, 'a@example.com', 'long-password');
+    expect(authenticate(db, email, password)).toBeUndefined();
+    expect(db.prepare('SELECT COUNT(*) AS n FROM accounts').get()).toEqual({ n: 1 });
+  });
+
   it('stores a salted hash, never the password', () => {
     createAccount(db, 'a@example.com', 'long-password');
     const row = db.prepare('SELECT password_hash FROM accounts').get() as { password_hash: string };
