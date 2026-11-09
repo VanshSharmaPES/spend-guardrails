@@ -41,6 +41,10 @@ export function evaluatePerTransactionCap(
   };
 }
 
+// A purchase that went through: allowed outright, or approved and paid. Denied, rejected and
+// still-pending proposals moved no money, so they do not count towards spend or velocity.
+const wentThrough = (e: AuditEntry) => e.verdict.decision === 'ALLOW' || !!e.execution;
+
 export function evaluateRollingWindowCap(
   proposal: PurchaseProposal,
   context: RuleContext,
@@ -51,7 +55,7 @@ export function evaluateRollingWindowCap(
   const spentWithin = (days: number) =>
     context.history
       .filter((e) => e.proposal.agentId === proposal.agentId)
-      .filter((e) => e.verdict.decision === 'ALLOW' || e.execution)
+      .filter(wentThrough)
       .filter((e) => daysBetween(e.createdAt, context.now) <= days)
       .reduce((sum, e) => sum + e.proposal.amountInHomeCurrency,0);
 
@@ -131,6 +135,7 @@ export function evaluateVelocityLimit(
 ): PolicyVerdict | null {
   const countLastHour = context.history
     .filter((e) => e.proposal.agentId === proposal.agentId)
+    .filter(wentThrough)
     .filter((e) => hoursBetween(e.createdAt, context.now) <= 1)
     .length;
 

@@ -266,8 +266,18 @@ describe('velocity-limit', () => {
     expect(evaluateVelocityLimit(proposal(), ctx(recent(3, { hoursAgo: 2 })), rule)).toBeNull();
   });
 
-  it('counts denied proposals too', () => {
-    expect(evaluateVelocityLimit(proposal(), ctx(recent(3, { decision: 'DENY' })), rule)).not.toBeNull();
+  it('ignores proposals that moved no money', () => {
+    const history = [
+      ...recent(2, { decision: 'DENY' }),
+      ...recent(2, { decision: 'ESCALATE' }),
+      ...recent(2),
+    ];
+    expect(evaluateVelocityLimit(proposal(), ctx(history), rule)).toBeNull();
+  });
+
+  it('counts escalations that were approved and paid', () => {
+    const history = [...recent(2), ...recent(1, { decision: 'ESCALATE', executed: true })];
+    expect(evaluateVelocityLimit(proposal(), ctx(history), rule)).not.toBeNull();
   });
 
   it('ignores other agents', () => {
