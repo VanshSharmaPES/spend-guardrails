@@ -138,8 +138,9 @@ Retries reuse the decision ID as PayPal's request ID, so a retry cannot charge t
   shows that roles are enforced, not that the deployment is private.
 - The hosted demo runs on a free instance. Its data, including accounts you create,
   resets when it restarts.
-- The velocity rule denies purchases after 5 in an hour. If every goal is denied by
-  `velocity`, that is the policy working. It clears after an hour or a restart.
+- The velocity rule denies new purchases once 5 have gone through in an hour. Denied
+  and pending requests don't count. If a goal is denied by `velocity`, that is the
+  policy working. It clears after an hour or a restart.
 
 ## Development
 
